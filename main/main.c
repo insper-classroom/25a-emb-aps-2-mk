@@ -1,137 +1,118 @@
-/*
- * LED blink with FreeRTOS
- */
 #include <FreeRTOS.h>
 #include <task.h>
 #include <semphr.h>
 #include <queue.h>
-
 #include "ssd1306.h"
+#include "hardware/adc.h"
+#include "hardware/gpio.h"
 #include "gfx.h"
-
 #include "pico/stdlib.h"
 #include <stdio.h>
 
-const uint BTN_1_OLED = 28;
-const uint BTN_2_OLED = 26;
-const uint BTN_3_OLED = 27;
+#define VRX_PIN 26
+#define VRY_PIN 27
 
-const uint LED_1_OLED = 20;
-const uint LED_2_OLED = 21;
-const uint LED_3_OLED = 22;
+QueueHandle_t xQueueADC;
 
-void oled1_btn_led_init(void) {
-    gpio_init(LED_1_OLED);
-    gpio_set_dir(LED_1_OLED, GPIO_OUT);
+typedef struct {
+    int id;
+    int dados;
+} adc_t;
 
-    gpio_init(LED_2_OLED);
-    gpio_set_dir(LED_2_OLED, GPIO_OUT);
+int media_movel(int *contagem_amostras, int array_dados[], int novo_valor) {
+    // Se ? V : F 
+    int divisor = (*contagem_amostras < 5) ? ++(*contagem_amostras) : 5;
+    int indice = (*contagem_amostras - 1) % 5;
+    
+    array_dados[indice] = novo_valor;
 
-    gpio_init(LED_3_OLED);
-    gpio_set_dir(LED_3_OLED, GPIO_OUT);
-
-    gpio_init(BTN_1_OLED);
-    gpio_set_dir(BTN_1_OLED, GPIO_IN);
-    gpio_pull_up(BTN_1_OLED);
-
-    gpio_init(BTN_2_OLED);
-    gpio_set_dir(BTN_2_OLED, GPIO_IN);
-    gpio_pull_up(BTN_2_OLED);
-
-    gpio_init(BTN_3_OLED);
-    gpio_set_dir(BTN_3_OLED, GPIO_IN);
-    gpio_pull_up(BTN_3_OLED);
-}
-
-void oled1_demo_1(void *p) {
-    printf("Inicializando Driver\n");
-    ssd1306_init();
-
-    printf("Inicializando GLX\n");
-    ssd1306_t disp;
-    gfx_init(&disp, 128, 32);
-
-    printf("Inicializando btn and LEDs\n");
-    oled1_btn_led_init();
-
-    char cnt = 15;
-    while (1) {
-
-        if (gpio_get(BTN_1_OLED) == 0) {
-            cnt = 15;
-            gpio_put(LED_1_OLED, 0);
-            gfx_clear_buffer(&disp);
-            gfx_draw_string(&disp, 0, 0, 1, "LED 1 - ON");
-            gfx_show(&disp);
-        } else if (gpio_get(BTN_2_OLED) == 0) {
-            cnt = 15;
-            gpio_put(LED_2_OLED, 0);
-            gfx_clear_buffer(&disp);
-            gfx_draw_string(&disp, 0, 0, 1, "LED 2 - ON");
-            gfx_show(&disp);
-        } else if (gpio_get(BTN_3_OLED) == 0) {
-            cnt = 15;
-            gpio_put(LED_3_OLED, 0);
-            gfx_clear_buffer(&disp);
-            gfx_draw_string(&disp, 0, 0, 1, "LED 3 - ON");
-            gfx_show(&disp);
-        } else {
-
-            gpio_put(LED_1_OLED, 1);
-            gpio_put(LED_2_OLED, 1);
-            gpio_put(LED_3_OLED, 1);
-            gfx_clear_buffer(&disp);
-            gfx_draw_string(&disp, 0, 0, 1, "PRESSIONE ALGUM");
-            gfx_draw_string(&disp, 0, 10, 1, "BOTAO");
-            gfx_draw_line(&disp, 15, 27, cnt,
-                          27);
-            vTaskDelay(pdMS_TO_TICKS(50));
-            if (++cnt == 112)
-                cnt = 15;
-
-            gfx_show(&disp);
-        }
+    int soma = 0;
+    for (int i = 0; i < divisor; i++) {
+        soma += array_dados[i];
     }
+    
+    return (soma / divisor);
 }
 
-void oled1_demo_2(void *p) {
-    printf("Inicializando Driver\n");
-    ssd1306_init();
-
-    printf("Inicializando GLX\n");
-    ssd1306_t disp;
-    gfx_init(&disp, 128, 32);
-
-    printf("Inicializando btn and LEDs\n");
-    oled1_btn_led_init();
-
-    char cnt = 15;
-    while (1) {
-
-        gfx_clear_buffer(&disp);
-        gfx_draw_string(&disp, 0, 0, 1, "Mandioca");
-        gfx_show(&disp);
-        vTaskDelay(pdMS_TO_TICKS(150));
-
-        gfx_clear_buffer(&disp);
-        gfx_draw_string(&disp, 0, 0, 2, "Batata");
-        gfx_show(&disp);
-        vTaskDelay(pdMS_TO_TICKS(150));
-
-        gfx_clear_buffer(&disp);
-        gfx_draw_string(&disp, 0, 0, 4, "Inhame");
-        gfx_show(&disp);
-        vTaskDelay(pdMS_TO_TICKS(150));
-    }
-}
-
-int main() {
+void inicializar_hardware(void) {
     stdio_init_all();
+    uart_init(uart_default, 115200);
+    gpio_set_function(0, GPIO_FUNC_UART);
+    gpio_set_function(1, GPIO_FUNC_UART);
+    adc_init();
+    adc_gpio_init(VRX_PIN);
+    adc_gpio_init(VRY_PIN);
+}
 
-    xTaskCreate(oled1_demo_2, "Demo 2", 4095, NULL, 1, NULL);
+void x_task(void *parametros) {
+    int contagem_amostras = 0;
+    int dados_x[5] = {0};
+    adc_t leitura_x = {.id = 0};
 
+    while (1) {
+        adc_select_input(0);
+        double raw_x = (double)(adc_read() - 2047) * (255.0/2047.0);
+        
+        leitura_x.dados = media_movel(&contagem_amostras, dados_x, (int)raw_x);
+        // Se ? V : ( Se ? V : F )
+        leitura_x.dados = (leitura_x.dados < -255) ? -255 : ( (leitura_x.dados > 255) ? 255 : leitura_x.dados );
+
+        if (leitura_x.dados > 30 || leitura_x.dados < -30) {
+            xQueueSend(xQueueADC, &leitura_x, 1000);
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void y_task(void *parametros) {
+    int contagem_amostras = 0;
+    int dados_y[5] = {0};
+    adc_t leitura_y = {.id = 1};
+
+    while (1) {
+        adc_select_input(1);
+        double raw_y = (double)(adc_read() - 2047) * (255.0/2047.0);
+        
+        leitura_y.dados = media_movel(&contagem_amostras, dados_y, (int)raw_y);
+        // Se ? V : ( Se ? V : F )
+        leitura_y.dados = (leitura_y.dados < -255) ? -255 : ( (leitura_y.dados > 255) ? 255 : leitura_y.dados );
+
+        if (leitura_y.dados > 30 || leitura_y.dados < -30) {
+            xQueueSend(xQueueADC, &leitura_y, 1000);
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void uart_task(void *parametros) {
+    adc_t dados_recebidos;
+
+    while (1) {
+        if (xQueueReceive(xQueueADC, &dados_recebidos, 100)) {
+            uint8_t byte_1 = ((uint16_t)dados_recebidos.dados) >> 8 & 0xFF;
+            uint8_t byte_0 = (uint8_t)dados_recebidos.dados & 0xFF;
+
+            uart_putc_raw(uart_default, dados_recebidos.id);
+            uart_putc_raw(uart_default, byte_0);
+            uart_putc_raw(uart_default, byte_1);
+            uart_putc_raw(uart_default, 0xFF);
+        }
+
+    }
+}
+
+int main(void) {
+    inicializar_hardware();
+    
+    xQueueADC = xQueueCreate(64, sizeof(adc_t));
+    
+    xTaskCreate(x_task, "Tarefa Eixo X", 4095, NULL, 1, NULL);
+    xTaskCreate(y_task, "Tarefa Eixo Y", 4095, NULL, 1, NULL);
+    xTaskCreate(uart_task, "Tarefa UART", 4095, NULL, 1, NULL);
+    
     vTaskStartScheduler();
-
-    while (true)
-        ;
+    
+    while (true);
 }
