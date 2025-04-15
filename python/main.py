@@ -9,12 +9,30 @@ from time import sleep
 
 from pynput import keyboard
 
+teclado = keyboard.Controller()
+
 def move(axis, value):
     """Move o mouse de acordo com o eixo e valor recebidos."""
     if axis == 0:
-        pyautogui.moveRel(value, 0)
+        if (value > 0):
+            teclado.release('s')
+            teclado.press('w')
+        elif (-30 <= value <= 30):
+            teclado.release('s')
+            teclado.release('w')    
+        else:
+            teclado.release('w')
+            teclado.press('s')
     elif axis == 1:
-        pyautogui.moveRel(0, value)
+        if (value < 0):
+            teclado.release('d')
+            teclado.press('a')
+        elif (-30 <= value <= 30):
+            teclado.release('a')
+            teclado.release('d')
+        else:
+            teclado.release('a')
+            teclado.press('d')
 
 def controle(ser):
     """

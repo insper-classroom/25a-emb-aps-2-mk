@@ -11,6 +11,8 @@
 
 #define VRX_PIN 26
 #define VRY_PIN 27
+#define BTN_G 16
+#define BTN_R 17
 
 QueueHandle_t xQueueADC;
 
@@ -48,6 +50,7 @@ void x_task(void *parametros) {
     int contagem_amostras = 0;
     int dados_x[5] = {0};
     adc_t leitura_x = {.id = 0};
+    int mandou_zero_x = 0;
 
     while (1) {
         adc_select_input(0);
@@ -59,6 +62,11 @@ void x_task(void *parametros) {
 
         if (leitura_x.dados > 30 || leitura_x.dados < -30) {
             xQueueSend(xQueueADC, &leitura_x, 1000);
+            mandou_zero_x = 0;
+        } else if(!mandou_zero_x){
+            leitura_x.dados = 0;
+            xQueueSend(xQueueADC, &leitura_x, 1000);
+            mandou_zero_x = 1; 
         }
         
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -69,6 +77,7 @@ void y_task(void *parametros) {
     int contagem_amostras = 0;
     int dados_y[5] = {0};
     adc_t leitura_y = {.id = 1};
+    int mandou_zero_y = 0;
 
     while (1) {
         adc_select_input(1);
@@ -80,6 +89,11 @@ void y_task(void *parametros) {
 
         if (leitura_y.dados > 30 || leitura_y.dados < -30) {
             xQueueSend(xQueueADC, &leitura_y, 1000);
+            mandou_zero_y = 0;
+        } else if (!mandou_zero_y){
+            leitura_y.dados = 0;
+            xQueueSend(xQueueADC, &leitura_y, 1000);
+            mandou_zero_y = 1;
         }
         
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -90,7 +104,7 @@ void uart_task(void *parametros) {
     adc_t dados_recebidos;
 
     while (1) {
-        if (xQueueReceive(xQueueADC, &dados_recebidos, 100)) {
+        if (xQueueReceive(xQueueADC, &dados_recebidos, portMAX_DELAY)) {
             uint8_t byte_1 = ((uint16_t)dados_recebidos.dados) >> 8 & 0xFF;
             uint8_t byte_0 = (uint8_t)dados_recebidos.dados & 0xFF;
 
