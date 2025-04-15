@@ -7,12 +7,14 @@ from tkinter import ttk
 from tkinter import messagebox
 from time import sleep
 
-from pynput import keyboard
+from pynput import keyboard, mouse
 
 teclado = keyboard.Controller()
+click = mouse.Controller()
 
 def move(axis, value):
     """Move o mouse de acordo com o eixo e valor recebidos."""
+    print("AXIS: ", axis)
     if axis == 0:
         if (value > 0):
             teclado.release('s')
@@ -33,6 +35,13 @@ def move(axis, value):
         else:
             teclado.release('a')
             teclado.press('d')
+    elif (axis == 2):
+        click.press(mouse.Button.left)
+        click.release(mouse.Button.left)
+    elif (axis == 5):
+        teclado.press('e')
+        teclado.release('e')
+        
 
 def controle(ser):
     """
@@ -49,7 +58,7 @@ def controle(ser):
             data = ser.read(size=3)
             if len(data) < 3:
                 continue
-            print(data)
+            # print(data)
             axis, value = parse_data(data)
             move(axis, value)
 

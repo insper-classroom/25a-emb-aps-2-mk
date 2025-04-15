@@ -2,12 +2,14 @@
 #include <task.h>
 #include <semphr.h>
 #include <queue.h>
+#include <string.h> 
 #include "ssd1306.h"
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "gfx.h"
 #include "pico/stdlib.h"
 #include <stdio.h>
+#include "hardware/irq.h"
 
 #define VRX_PIN 26
 #define VRY_PIN 27
@@ -15,11 +17,40 @@
 #define BTN_R 17
 
 QueueHandle_t xQueueADC;
+SemaphoreHandle_t xSemaphoreInvetario;
+SemaphoreHandle_t xSemaphorePressiona;
 
 typedef struct {
     int id;
     int dados;
 } adc_t;
+
+void btn_callback(uint gpio, uint32_t events) {
+    if (gpio == BTN_G){ 
+        xSemaphoreGiveFromISR(xSemaphorePressiona, 0);
+    } else if (gpio == BTN_R) {
+        xSemaphoreGiveFromISR(xSemaphoreInvetario, 0);
+    }
+}
+
+void btn_task(void *parametros) {
+    adc_t leitura_btn;
+
+    while (1) {
+        if (xSemaphoreTake(xSemaphoreInvetario, 100)){
+            leitura_btn.id = 5;
+            leitura_btn.dados = 0;
+            xQueueSend(xQueueADC, &leitura_btn, 1000);
+        } 
+        if (xSemaphoreTake(xSemaphorePressiona, 100)){
+            leitura_btn.id = 2;
+            leitura_btn.dados = 0;
+            xQueueSend(xQueueADC, &leitura_btn, 1000);
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
 
 int media_movel(int *contagem_amostras, int array_dados[], int novo_valor) {
     // Se ? V : F 
@@ -121,9 +152,22 @@ int main(void) {
     inicializar_hardware();
     
     xQueueADC = xQueueCreate(64, sizeof(adc_t));
+    xSemaphoreInvetario = xSemaphoreCreateBinary();
+    xSemaphorePressiona = xSemaphoreCreateBinary();
+
+    gpio_init(BTN_G);
+    gpio_set_dir(BTN_G, GPIO_IN);
+    gpio_pull_up(BTN_G);
+    gpio_set_irq_enabled_with_callback(BTN_G, GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+
+    gpio_init(BTN_R);
+    gpio_set_dir(BTN_R, GPIO_IN);
+    gpio_pull_up(BTN_R);
+    gpio_set_irq_enabled_with_callback(BTN_R, GPIO_IRQ_EDGE_RISE, true, &btn_callback);
     
     xTaskCreate(x_task, "Tarefa Eixo X", 4095, NULL, 1, NULL);
     xTaskCreate(y_task, "Tarefa Eixo Y", 4095, NULL, 1, NULL);
+    xTaskCreate(btn_task, "Tarefa Botoes", 4095, NULL, 1, NULL);
     xTaskCreate(uart_task, "Tarefa UART", 4095, NULL, 1, NULL);
     
     vTaskStartScheduler();
