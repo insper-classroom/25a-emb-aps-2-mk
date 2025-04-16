@@ -14,7 +14,7 @@ click = mouse.Controller()
 
 def move(axis, value):
     """Move o mouse de acordo com o eixo e valor recebidos."""
-    print("AXIS: ", axis)
+    print(f"AXIS: {axis} \n")
     if axis == 0:
         if (value > 0):
             teclado.release('s')
@@ -36,11 +36,15 @@ def move(axis, value):
             teclado.release('a')
             teclado.press('d')
     elif (axis == 2):
-        click.press(mouse.Button.left)
-        click.release(mouse.Button.left)
+        if (value == 1):
+            click.press(mouse.Button.left)
+        else:
+            click.release(mouse.Button.left)
     elif (axis == 5):
-        teclado.press('e')
-        teclado.release('e')
+        if (value == 1):
+            teclado.press('e')
+        else:
+            teclado.release('e')
         
 
 def controle(ser):
@@ -58,7 +62,7 @@ def controle(ser):
             data = ser.read(size=3)
             if len(data) < 3:
                 continue
-            # print(data)
+            print(f"{data} \n")
             axis, value = parse_data(data)
             move(axis, value)
 

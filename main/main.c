@@ -19,6 +19,8 @@
 QueueHandle_t xQueueADC;
 SemaphoreHandle_t xSemaphoreInvetario;
 SemaphoreHandle_t xSemaphorePressiona;
+volatile int estado_g = 0;
+volatile int estado_r = 0;
 
 typedef struct {
     int id;
@@ -26,26 +28,48 @@ typedef struct {
 } adc_t;
 
 void btn_callback(uint gpio, uint32_t events) {
-    if (gpio == BTN_G){ 
+    if (gpio == BTN_G){
+        if (events == 0x4) { 
+            estado_g = 1;
+        } else if (events == 0x8) { 
+            estado_g = 0;
+        }
+
         xSemaphoreGiveFromISR(xSemaphorePressiona, 0);
     } else if (gpio == BTN_R) {
+        if (events == 0x4) { 
+            estado_r = 1;
+        } else if (events == 0x8) { 
+            estado_r = 0;
+        }
+
         xSemaphoreGiveFromISR(xSemaphoreInvetario, 0);
     }
 }
 
-void btn_task(void *parametros) {
-    adc_t leitura_btn;
+void btn_inv_task(void *parametros) {
+    adc_t leitura_inv;
 
     while (1) {
-        if (xSemaphoreTake(xSemaphoreInvetario, 100)){
-            leitura_btn.id = 5;
-            leitura_btn.dados = 0;
-            xQueueSend(xQueueADC, &leitura_btn, 1000);
-        } 
-        if (xSemaphoreTake(xSemaphorePressiona, 100)){
-            leitura_btn.id = 2;
-            leitura_btn.dados = 0;
-            xQueueSend(xQueueADC, &leitura_btn, 1000);
+        if (xSemaphoreTake(xSemaphoreInvetario, 10)){
+            leitura_inv.id = 5;
+            leitura_inv.dados = estado_r;
+            xQueueSend(xQueueADC, &leitura_inv, 10);
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void btn_press_task(void *parametros) {
+    adc_t leitura_press;
+
+    while (1) {
+
+        if (xSemaphoreTake(xSemaphorePressiona, 10)){
+            leitura_press.id = 2;
+            leitura_press.dados = estado_g;
+            xQueueSend(xQueueADC, &leitura_press, 10);
         }
         
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -139,10 +163,10 @@ void uart_task(void *parametros) {
             uint8_t byte_1 = ((uint16_t)dados_recebidos.dados) >> 8 & 0xFF;
             uint8_t byte_0 = (uint8_t)dados_recebidos.dados & 0xFF;
 
+            uart_putc_raw(uart_default, 0xFF);
             uart_putc_raw(uart_default, dados_recebidos.id);
             uart_putc_raw(uart_default, byte_0);
             uart_putc_raw(uart_default, byte_1);
-            uart_putc_raw(uart_default, 0xFF);
         }
 
     }
@@ -158,16 +182,17 @@ int main(void) {
     gpio_init(BTN_G);
     gpio_set_dir(BTN_G, GPIO_IN);
     gpio_pull_up(BTN_G);
-    gpio_set_irq_enabled_with_callback(BTN_G, GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+    gpio_set_irq_enabled_with_callback(BTN_G, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
 
     gpio_init(BTN_R);
     gpio_set_dir(BTN_R, GPIO_IN);
     gpio_pull_up(BTN_R);
-    gpio_set_irq_enabled_with_callback(BTN_R, GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+    gpio_set_irq_enabled_with_callback(BTN_R, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
     
     xTaskCreate(x_task, "Tarefa Eixo X", 4095, NULL, 1, NULL);
     xTaskCreate(y_task, "Tarefa Eixo Y", 4095, NULL, 1, NULL);
-    xTaskCreate(btn_task, "Tarefa Botoes", 4095, NULL, 1, NULL);
+    xTaskCreate(btn_inv_task, "Tarefa Botao Inv", 4095, NULL, 1, NULL);
+    xTaskCreate(btn_press_task, "Tarefa Botao Press", 4095, NULL, 1, NULL);
     xTaskCreate(uart_task, "Tarefa UART", 4095, NULL, 1, NULL);
     
     vTaskStartScheduler();
