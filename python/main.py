@@ -2,6 +2,7 @@ import sys
 import glob
 import serial
 import pyautogui
+pyautogui.PAUSE=0.0
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
@@ -11,47 +12,75 @@ from pynput import keyboard, mouse
 
 teclado = keyboard.Controller()
 click = mouse.Controller()
+i_inv = 1
+inv = False
 
 def move(axis, value):
+    global i_inv, inv
+    inv_teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0','-','=']
     """Move o mouse de acordo com o eixo e valor recebidos."""
-    print(f"AXIS: {axis} \n")
-    if axis == 0:
-        if (value > 0):
-            teclado.release('s')
-            teclado.press('w')
-        elif (-30 <= value <= 30):
-            teclado.release('s')
-            teclado.release('w')    
+    # print(f"AXIS: {axis} \n")
+    if (axis == 0):
+        if (inv):
+            pyautogui.moveRel(0, -value*0.7)
         else:
-            teclado.release('w')
-            teclado.press('s')
-    elif axis == 1:
-        if (value < 0):
-            teclado.release('d')
-            teclado.press('a')
-        elif (-30 <= value <= 30):
-            teclado.release('a')
-            teclado.release('d')
+            if (value > 0):
+                teclado.release('s')
+                teclado.press('w')
+            elif (-30 <= value <= 30):
+                teclado.release('s')
+                teclado.release('w')    
+            else:
+                teclado.release('w')
+                teclado.press('s')
+
+    elif (axis == 1):
+        if (inv):
+            pyautogui.moveRel(value*0.7, 0)
         else:
-            teclado.release('a')
-            teclado.press('d')
+            if (value < 0):
+                teclado.release('d')
+                teclado.press('a')
+            elif (-30 <= value <= 30):
+                teclado.release('a')
+                teclado.release('d')
+            else:
+                teclado.release('a')
+                teclado.press('d')
+
     elif (axis == 2):
         if (value == 1):
             click.press(mouse.Button.left)
         else:
             click.release(mouse.Button.left)
+
     elif (axis == 5):
         if (value == 1):
             teclado.press('e')
+            inv = not inv
         else:
             teclado.release('e')
-        
+    
+    elif (axis == 6):
+        if (value == 1):
+            i_inv = (i_inv-1) % 12
+            teclado.press(inv_teclas[i_inv])
+        else:
+            teclado.release(inv_teclas[i_inv])
+    
+    elif (axis == 7):
+        if (value == 1):
+            i_inv = (i_inv+1) % 12
+            teclado.press(inv_teclas[i_inv])
+        else:
+            teclado.release(inv_teclas[i_inv])
 
 def controle(ser):
     """
     Loop principal que lê bytes da porta serial em loop infinito.
     Aguarda o byte 0xFF e então lê 3 bytes: axis (1 byte) + valor (2 bytes).
     """
+    global inv
     while True:
         # Aguardar byte de sincronização
         sync_byte = ser.read(size=1)
@@ -62,8 +91,9 @@ def controle(ser):
             data = ser.read(size=3)
             if len(data) < 3:
                 continue
-            print(f"{data} \n")
+            print(f"{data} e {inv}\n")
             axis, value = parse_data(data)
+
             move(axis, value)
 
 def serial_ports():

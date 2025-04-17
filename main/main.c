@@ -15,64 +15,49 @@
 #define VRY_PIN 27
 #define BTN_G 16
 #define BTN_R 17
+#define BTN_ESQ 14
+#define BTN_DIR 15
 
 QueueHandle_t xQueueADC;
-SemaphoreHandle_t xSemaphoreInvetario;
-SemaphoreHandle_t xSemaphorePressiona;
-volatile int estado_g = 0;
-volatile int estado_r = 0;
+QueueHandle_t xQueueBTN;
+volatile bool timer_fired = false;
 
 typedef struct {
     int id;
     int dados;
 } adc_t;
 
+int64_t alarm_callback(alarm_id_t id, void *user_data) {
+    timer_fired = true;
+
+    return 0;
+}
+
 void btn_callback(uint gpio, uint32_t events) {
+    adc_t btn;
+
     if (gpio == BTN_G){
-        if (events == 0x4) { 
-            estado_g = 1;
-        } else if (events == 0x8) { 
-            estado_g = 0;
-        }
-
-        xSemaphoreGiveFromISR(xSemaphorePressiona, 0);
+        btn.id = 2;
     } else if (gpio == BTN_R) {
-        if (events == 0x4) { 
-            estado_r = 1;
-        } else if (events == 0x8) { 
-            estado_r = 0;
-        }
-
-        xSemaphoreGiveFromISR(xSemaphoreInvetario, 0);
+        btn.id = 5;
+    } else if (gpio == BTN_ESQ){
+        btn.id = 6;
+    } else if (gpio = BTN_DIR){
+        btn.id = 7;
     }
-}
 
-void btn_inv_task(void *parametros) {
-    adc_t leitura_inv;
-
-    while (1) {
-        if (xSemaphoreTake(xSemaphoreInvetario, 10)){
-            leitura_inv.id = 5;
-            leitura_inv.dados = estado_r;
-            xQueueSend(xQueueADC, &leitura_inv, 10);
-        }
-        
-        vTaskDelay(pdMS_TO_TICKS(10));
+    if (events == 0x4) { 
+        btn.dados = 1;
+    } else if (events == 0x8) { 
+        btn.dados = 0;
     }
-}
 
-void btn_press_task(void *parametros) {
-    adc_t leitura_press;
-
-    while (1) {
-
-        if (xSemaphoreTake(xSemaphorePressiona, 10)){
-            leitura_press.id = 2;
-            leitura_press.dados = estado_g;
-            xQueueSend(xQueueADC, &leitura_press, 10);
+    if (events != 12){
+        if (btn.id == 2){
+            xQueueSendFromISR(xQueueADC, &btn, 0);
+        } else {
+            xQueueSendFromISR(xQueueBTN, &btn, 0);
         }
-        
-        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -93,12 +78,34 @@ int media_movel(int *contagem_amostras, int array_dados[], int novo_valor) {
 
 void inicializar_hardware(void) {
     stdio_init_all();
+
     uart_init(uart_default, 115200);
     gpio_set_function(0, GPIO_FUNC_UART);
     gpio_set_function(1, GPIO_FUNC_UART);
+
     adc_init();
     adc_gpio_init(VRX_PIN);
     adc_gpio_init(VRY_PIN);
+
+    gpio_init(BTN_G);
+    gpio_set_dir(BTN_G, GPIO_IN);
+    gpio_pull_up(BTN_G);
+    gpio_set_irq_enabled_with_callback(BTN_G, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+
+    gpio_init(BTN_R);
+    gpio_set_dir(BTN_R, GPIO_IN);
+    gpio_pull_up(BTN_R);
+    gpio_set_irq_enabled_with_callback(BTN_R, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+
+    gpio_init(BTN_DIR);
+    gpio_set_dir(BTN_DIR, GPIO_IN);
+    gpio_pull_up(BTN_DIR);
+    gpio_set_irq_enabled_with_callback(BTN_DIR, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+
+    gpio_init(BTN_ESQ);
+    gpio_set_dir(BTN_ESQ, GPIO_IN);
+    gpio_pull_up(BTN_ESQ);
+    gpio_set_irq_enabled_with_callback(BTN_ESQ, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
 }
 
 void x_task(void *parametros) {
@@ -124,7 +131,7 @@ void x_task(void *parametros) {
             mandou_zero_x = 1; 
         }
         
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(150));
     }
 }
 
@@ -151,7 +158,7 @@ void y_task(void *parametros) {
             mandou_zero_y = 1;
         }
         
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(150));
     }
 }
 
@@ -169,31 +176,47 @@ void uart_task(void *parametros) {
             uart_putc_raw(uart_default, byte_1);
         }
 
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void btn_task (void *parametros){
+    adc_t btn_recebido;
+    alarm_id_t alarm;
+    int alarme_adicionado = 0;
+
+    while(1){
+        if (xQueueReceive(xQueueBTN, &btn_recebido, 10) && !alarme_adicionado) {
+            if (btn_recebido.dados == 1){
+                xQueueSend(xQueueADC, &btn_recebido, 10);
+                vTaskDelay(pdMS_TO_TICKS(50));
+                btn_recebido.dados = 0;
+                xQueueSend(xQueueADC, &btn_recebido, 10);
+                alarme_adicionado = 1;
+                alarm = add_alarm_in_ms(750, alarm_callback, NULL, false);
+            }
+        }
+
+        if (timer_fired){
+            alarme_adicionado = 0;
+            timer_fired = false;
+            cancel_alarm(alarm);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(150));
     }
 }
 
 int main(void) {
-    inicializar_hardware();
+   inicializar_hardware();
     
-    xQueueADC = xQueueCreate(64, sizeof(adc_t));
-    xSemaphoreInvetario = xSemaphoreCreateBinary();
-    xSemaphorePressiona = xSemaphoreCreateBinary();
-
-    gpio_init(BTN_G);
-    gpio_set_dir(BTN_G, GPIO_IN);
-    gpio_pull_up(BTN_G);
-    gpio_set_irq_enabled_with_callback(BTN_G, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
-
-    gpio_init(BTN_R);
-    gpio_set_dir(BTN_R, GPIO_IN);
-    gpio_pull_up(BTN_R);
-    gpio_set_irq_enabled_with_callback(BTN_R, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+    xQueueADC = xQueueCreate(8, sizeof(adc_t));
+    xQueueBTN = xQueueCreate(8, sizeof(adc_t));
     
     xTaskCreate(x_task, "Tarefa Eixo X", 4095, NULL, 1, NULL);
     xTaskCreate(y_task, "Tarefa Eixo Y", 4095, NULL, 1, NULL);
-    xTaskCreate(btn_inv_task, "Tarefa Botao Inv", 4095, NULL, 1, NULL);
-    xTaskCreate(btn_press_task, "Tarefa Botao Press", 4095, NULL, 1, NULL);
     xTaskCreate(uart_task, "Tarefa UART", 4095, NULL, 1, NULL);
+    xTaskCreate(btn_task, "Tarefa BTN", 4095, NULL, 1, NULL);
     
     vTaskStartScheduler();
     
