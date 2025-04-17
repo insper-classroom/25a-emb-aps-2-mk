@@ -42,7 +42,7 @@ void btn_callback(uint gpio, uint32_t events) {
         btn.id = 5;
     } else if (gpio == BTN_ESQ){
         btn.id = 6;
-    } else if (gpio = BTN_DIR){
+    } else if (gpio == BTN_DIR){
         btn.id = 7;
     }
 
