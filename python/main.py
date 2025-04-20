@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
 from time import sleep
+from PIL import Image, ImageTk
 
 from pynput import keyboard, mouse
 
@@ -162,75 +163,85 @@ def conectar_porta(port_name, root, botao_conectar, status_label, mudar_cor_circ
 
 def criar_janela():
     root = tk.Tk()
-    root.title("Controle de Mouse")
-    root.geometry("1000x625")
+    root.title("Stardew Valley Controller")
+    root.geometry("736x414")  # Matches the image size
     root.resizable(False, False)
 
-    # Dark mode color settings
-    dark_bg = "#2e2e2e"
-    dark_fg = "#ffffff"
-    accent_color = "#007acc"
-    root.configure(bg=dark_bg)
+    # Stardew Valley-inspired color palette
+    bg_color = "#f5e6c8"  # Soft cream for widget backgrounds
+    text_color = "#000000"  # Black for text
+    accent_color = "#8b5e3c"  # Wooden brown for buttons
+    active_color = "#a67c00"  # Golden yellow for active states
 
+    # Create a Canvas to hold the background image and other widgets
+    canvas = tk.Canvas(root, width=736, height=414, highlightthickness=0)
+    canvas.pack(fill="both", expand=True)
+
+    # Load and set background image using Pillow
+    try:
+        # Load the image with Pillow
+        image = Image.open("stardew_img.jpg")
+        # Convert to PhotoImage
+        bg_image = ImageTk.PhotoImage(image)
+        # Draw the image on the canvas
+        canvas.create_image(0, 0, image=bg_image, anchor="nw")
+        canvas.image = bg_image  # Prevent garbage collection
+    except Exception as e:
+        print(f"Error loading image: {e}")
+        canvas.configure(bg=bg_color)  # Fallback if image fails
+
+    # Configure ttk style with Stardew Valley aesthetic
     style = ttk.Style(root)
     style.theme_use("clam")
-    style.configure("TFrame", background=dark_bg)
-    style.configure("TLabel", background=dark_bg, foreground=dark_fg, font=("Segoe UI", 11))
-    style.configure("TButton", font=("Segoe UI", 10, "bold"),
-                    foreground=dark_fg, background="#444444", borderwidth=0)
-    style.map("TButton", background=[("active", "#555555")])
-    style.configure("Accent.TButton", font=("Segoe UI", 12, "bold"),
-                    foreground=dark_fg, background=accent_color, padding=6)
-    style.map("Accent.TButton", background=[("active", "#005f9e")])
+    style.configure("TLabel", background=bg_color, foreground=text_color, font=("Pixelify Sans", 12))
+    style.configure("TButton", font=("Pixelify Sans", 10, "bold"),
+                    foreground=text_color, background=accent_color, borderwidth=2, relief="raised")
+    style.map("TButton", background=[("active", active_color)], relief=[("active", "sunken")])
+    style.configure("Accent.TButton", font=("Pixelify Sans", 12, "bold"),
+                    foreground=text_color, background=accent_color, padding=8)
+    style.map("Accent.TButton", background=[("active", active_color)])
 
-    # Updated combobox styling to match the dark GUI color
+    # Combobox styling to match Stardew Valley's wooden UI
     style.configure("TCombobox",
-                    fieldbackground=dark_bg,
-                    background=dark_bg,
-                    foreground=dark_fg,
-                    padding=4)
-    style.map("TCombobox", fieldbackground=[("readonly", dark_bg)])
+                    fieldbackground=bg_color,
+                    background=accent_color,
+                    foreground=text_color,
+                    padding=4,
+                    font=("Pixelify Sans", 10))
+    style.map("TCombobox", fieldbackground=[("readonly", bg_color)])
 
-    # Main content frame (upper portion)
-    frame_principal = ttk.Frame(root, padding="20")
-    frame_principal.pack(expand=True, fill="both")
-
-    titulo_label = ttk.Label(frame_principal, text="Controle de Mouse", font=("Segoe UI", 14, "bold"))
-    titulo_label.pack(pady=(0, 10))
+    # Title with Stardew Valley-inspired font
+    titulo_label = ttk.Label(root, text="Stardew Valley", font=("Pixelify Sans", 20, "bold"))
+    canvas.create_window(736//2, 50, window=titulo_label)  # Place title at the top center
 
     porta_var = tk.StringVar(value="")
 
+    # Connect button with wooden button style
     botao_conectar = ttk.Button(
-        frame_principal,
-        text="Conectar e Iniciar Leitura",
+        root,
+        text="Conectar ao controle",
         style="Accent.TButton",
         command=lambda: conectar_porta(porta_var.get(), root, botao_conectar, status_label, mudar_cor_circulo)
     )
-    botao_conectar.pack(pady=10)
+    canvas.create_window(736//2, 120, window=botao_conectar)  # Place button below the title
 
-    # Create footer frame with grid layout to host status label, port dropdown, and status circle
-    footer_frame = tk.Frame(root, bg=dark_bg)
-    footer_frame.pack(side="bottom", fill="x", padx=10, pady=(10, 0))
+    # Status label with a background for readability
+    status_label = tk.Label(root, text="Aguardando seleção de porta", font=("Pixelify Sans", 8),
+                            bg=bg_color, fg=text_color)
+    canvas.create_window(50, 414 - 20, window=status_label, anchor="w")  # Place at bottom left
 
-    # Left: Status label
-    status_label = tk.Label(footer_frame, text="Aguardando seleção de porta...", font=("Segoe UI", 11),
-                            bg=dark_bg, fg=dark_fg)
-    status_label.grid(row=0, column=0, sticky="w")
-
-    # Center: Port selection dropdown
+    # Port selection dropdown
     portas_disponiveis = serial_ports()
     if portas_disponiveis:
         porta_var.set(portas_disponiveis[0])
-    port_dropdown = ttk.Combobox(footer_frame, textvariable=porta_var,
-                                 values=portas_disponiveis, state="readonly", width=10)
-    port_dropdown.grid(row=0, column=1, padx=10)
+    port_dropdown = ttk.Combobox(root, textvariable=porta_var,
+                                 values=portas_disponiveis, state="readonly", width=12)
+    canvas.create_window(736//2 + 148, 414 - 20, window=port_dropdown)  # Place at bottom center
 
-    # Right: Status circle (canvas)
-    circle_canvas = tk.Canvas(footer_frame, width=20, height=20, highlightthickness=0, bg=dark_bg)
-    circle_item = circle_canvas.create_oval(2, 2, 18, 18, fill="red", outline="")
-    circle_canvas.grid(row=0, column=2, sticky="e")
-
-    footer_frame.columnconfigure(1, weight=1)
+    # Status circle (canvas) with a background for visibility
+    circle_canvas = tk.Canvas(root, width=20, height=20, highlightthickness=0, bg=bg_color)
+    circle_item = circle_canvas.create_oval(2, 2, 18, 18, fill="#a62e2e", outline="")  # Reddish for disconnected
+    canvas.create_window(736 - 50, 414 - 20, window=circle_canvas, anchor="e")  # Place at bottom right
 
     def mudar_cor_circulo(cor):
         circle_canvas.itemconfig(circle_item, fill=cor)
