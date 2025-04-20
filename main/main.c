@@ -17,6 +17,7 @@
 #define BTN_R 17
 #define BTN_ESQ 14
 #define BTN_DIR 15
+#define LED_CONEXAO 13
 
 QueueHandle_t xQueueADC;
 QueueHandle_t xQueueBTN;
@@ -106,6 +107,9 @@ void inicializar_hardware(void) {
     gpio_set_dir(BTN_ESQ, GPIO_IN);
     gpio_pull_up(BTN_ESQ);
     gpio_set_irq_enabled_with_callback(BTN_ESQ, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+
+    gpio_init(LED_CONEXAO);
+    gpio_set_dir(LED_CONEXAO, GPIO_OUT);
 }
 
 void x_task(void *parametros) {
@@ -207,6 +211,25 @@ void btn_task (void *parametros){
     }
 }
 
+void led_task(void *parametros) {
+    int conectado = 0;
+    char comando = 'e';
+    
+    while (1) {
+        comando = getchar_timeout_us(10000);
+
+        if (comando == 'c'){
+            conectado = 1;
+        } else if (comando == 'e'){
+            conectado = 0;
+        }
+
+        gpio_put(LED_CONEXAO, conectado);
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
 int main(void) {
    inicializar_hardware();
     
@@ -217,6 +240,7 @@ int main(void) {
     xTaskCreate(y_task, "Tarefa Eixo Y", 4095, NULL, 1, NULL);
     xTaskCreate(uart_task, "Tarefa UART", 4095, NULL, 1, NULL);
     xTaskCreate(btn_task, "Tarefa BTN", 4095, NULL, 1, NULL);
+    xTaskCreate(led_task, "Tarefa LED Conexao", 4095, NULL, 1, NULL);
     
     vTaskStartScheduler();
     

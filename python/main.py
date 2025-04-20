@@ -146,6 +146,8 @@ def conectar_porta(port_name, root, botao_conectar, status_label, mudar_cor_circ
         status_label.config(text=f"Conectado em {port_name}", foreground="green")
         mudar_cor_circulo("green")
         botao_conectar.config(text="Conectado")  # Update button text to indicate connection
+        print(f"Conectado em {port_name}")
+        ser.write(b'c')
         root.update()
 
         # Inicia o loop de leitura (bloqueante).
@@ -153,13 +155,23 @@ def conectar_porta(port_name, root, botao_conectar, status_label, mudar_cor_circ
 
     except KeyboardInterrupt:
         print("Encerrando via KeyboardInterrupt.")
+
     except Exception as e:
         messagebox.showerror("Erro de Conexão", f"Não foi possível conectar em {port_name}.\nErro: {e}")
         mudar_cor_circulo("red")
+
     finally:
-        ser.close()
+        if ser and ser.is_open:
+            try:
+                ser.write(b'e')  
+                sleep(0.1)  
+                ser.close()
+                print("Porta serial fechada.")
+            except Exception as e:
+                print(f"Erro ao fechar a porta: {e}")
         status_label.config(text="Conexão encerrada.", foreground="red")
         mudar_cor_circulo("red")
+
 
 def criar_janela():
     root = tk.Tk()
