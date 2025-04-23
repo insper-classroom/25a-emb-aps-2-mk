@@ -190,7 +190,6 @@ def conectar_porta(port_name, root, botao_conectar, status_label, mudar_cor_circ
         status_label.config(text="Conexão encerrada.", foreground="red")
         mudar_cor_circulo("red")
 
-
 def criar_janela():
     root = tk.Tk()
     root.title("Stardew Valley Controller")

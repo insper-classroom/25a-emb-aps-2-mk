@@ -57,19 +57,14 @@ void btn_callback(uint gpio, uint32_t events) {
         btn.id = 7;
     }
 
-    if (events == 0x4) { 
+    if (events & 0x4) { 
         btn.dados = 1;
     } else if (events == 0x8) { 
         btn.dados = 0;
     }
 
-    if (events != 12){
-        if (btn.id == 2){
-            xQueueSendFromISR(xQueueADC, &btn, 0);
-        } else {
-            xQueueSendFromISR(xQueueBTN, &btn, 0);
-        }
-    }
+    xQueueSendFromISR(xQueueADC, &btn, 0);
+    
 }
 
 int media_movel(int *contagem_amostras, int array_dados[], int novo_valor) {
@@ -106,32 +101,32 @@ void inicializar_hardware(void) {
     gpio_init(BTN_R);
     gpio_set_dir(BTN_R, GPIO_IN);
     gpio_pull_up(BTN_R);
-    gpio_set_irq_enabled_with_callback(BTN_R, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+    gpio_set_irq_enabled(BTN_R, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
 
     gpio_init(BTN_MISSAO);
     gpio_set_dir(BTN_MISSAO, GPIO_IN);
     gpio_pull_up(BTN_MISSAO);
-    gpio_set_irq_enabled_with_callback(BTN_MISSAO, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+    gpio_set_irq_enabled(BTN_MISSAO, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
 
     gpio_init(BTN_INTERACAO);
     gpio_set_dir(BTN_INTERACAO, GPIO_IN);
     gpio_pull_up(BTN_INTERACAO);
-    gpio_set_irq_enabled_with_callback(BTN_INTERACAO, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+    gpio_set_irq_enabled(BTN_INTERACAO, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
 
     gpio_init(BTN_MACRO);
     gpio_set_dir(BTN_MACRO, GPIO_IN);
     gpio_pull_up(BTN_MACRO);
-    gpio_set_irq_enabled_with_callback(BTN_MACRO, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+    gpio_set_irq_enabled(BTN_MACRO, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
 
     gpio_init(BTN_DIR);
     gpio_set_dir(BTN_DIR, GPIO_IN);
     gpio_pull_up(BTN_DIR);
-    gpio_set_irq_enabled_with_callback(BTN_DIR, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+    gpio_set_irq_enabled(BTN_DIR, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
 
     gpio_init(BTN_ESQ);
     gpio_set_dir(BTN_ESQ, GPIO_IN);
     gpio_pull_up(BTN_ESQ);
-    gpio_set_irq_enabled_with_callback(BTN_ESQ, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+    gpio_set_irq_enabled(BTN_ESQ, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
 
     gpio_init(LED_CONEXAO);
     gpio_set_dir(LED_CONEXAO, GPIO_OUT);
@@ -242,7 +237,6 @@ void led_task(void *parametros) {
     
     while (1) {
         comando = getchar_timeout_us(10000);
-
         if (comando == 'c'){
             conectado = 1;
         } else if (comando == 'e'){
@@ -256,7 +250,8 @@ void led_task(void *parametros) {
 }
 
 int main(void) {
-   inicializar_hardware();
+
+    inicializar_hardware();
     
     xQueueADC = xQueueCreate(8, sizeof(adc_t));
     xQueueBTN = xQueueCreate(8, sizeof(adc_t));
