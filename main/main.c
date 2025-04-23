@@ -18,31 +18,25 @@
 #define BTN_ESQ 14
 #define BTN_DIR 15
 
-#define BTN_INTERACAO 1
-#define BTN_MISSAO 1
-#define BTN_MACRO 1
+#define BTN_INTERACAO 18
+#define BTN_MISSAO 19
+#define BTN_MACRO 20
 
 #define LED_CONEXAO 13
 
 QueueHandle_t xQueueADC;
 QueueHandle_t xQueueBTN;
-volatile bool timer_fired = false;
 
 typedef struct {
     int id;
     int dados;
 } adc_t;
 
-int64_t alarm_callback(alarm_id_t id, void *user_data) {
-    timer_fired = true;
-
-    return 0;
-}
-
 void btn_callback(uint gpio, uint32_t events) {
     adc_t btn;
 
     // ids 0 e 1 -> joystick
+    // 2345678e
     if (gpio == BTN_G){
         btn.id = 2;
     } else if (gpio == BTN_INTERACAO){
@@ -204,39 +198,13 @@ void uart_task(void *parametros) {
     }
 }
 
-void btn_task (void *parametros){
-    adc_t btn_recebido;
-    alarm_id_t alarm;
-    int alarme_adicionado = 0;
-
-    while(1){
-        if (xQueueReceive(xQueueBTN, &btn_recebido, 10) && !alarme_adicionado) {
-            if (btn_recebido.dados == 1){
-                xQueueSend(xQueueADC, &btn_recebido, 10);
-                vTaskDelay(pdMS_TO_TICKS(50));
-                btn_recebido.dados = 0;
-                xQueueSend(xQueueADC, &btn_recebido, 10);
-                alarme_adicionado = 1;
-                alarm = add_alarm_in_ms(750, alarm_callback, NULL, false);
-            }
-        }
-
-        if (timer_fired){
-            alarme_adicionado = 0;
-            timer_fired = false;
-            cancel_alarm(alarm);
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(150));
-    }
-}
-
 void led_task(void *parametros) {
     int conectado = 0;
     char comando;
     
     while (1) {
         comando = getchar_timeout_us(10000);
+
         if (comando == 'c'){
             conectado = 1;
         } else if (comando == 'e'){
@@ -259,7 +227,6 @@ int main(void) {
     xTaskCreate(x_task, "Tarefa Eixo X", 4095, NULL, 1, NULL);
     xTaskCreate(y_task, "Tarefa Eixo Y", 4095, NULL, 1, NULL);
     xTaskCreate(uart_task, "Tarefa UART", 4095, NULL, 1, NULL);
-    xTaskCreate(btn_task, "Tarefa BTN", 4095, NULL, 1, NULL);
     xTaskCreate(led_task, "Tarefa LED Conexao", 4095, NULL, 1, NULL);
     
     vTaskStartScheduler();

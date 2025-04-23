@@ -24,9 +24,9 @@ def move(axis, value):
     # print(f"AXIS: {axis} \n")
     if (axis == 0):
         if (inv):
-            pyautogui.moveRel(0, -value*0.7)
+            pyautogui.moveRel(0, -value)
         elif (mis):
-            pyautogui.moveRel(0, -value*0.7)
+            pyautogui.moveRel(0, -value)
         else:
             if (value > 0):
                 teclado.release('s')
@@ -40,9 +40,9 @@ def move(axis, value):
 
     elif (axis == 1):
         if (inv):
-            pyautogui.moveRel(value*0.7, 0)
+            pyautogui.moveRel(value, 0)
         elif(mis):
-            pyautogui.moveRel(value*0.7, 0)
+            pyautogui.moveRel(value, 0)
         else:
             if (value < 0):
                 teclado.release('d')
@@ -110,7 +110,7 @@ def controle(ser):
             data = ser.read(size=3)
             if len(data) < 3:
                 continue
-            print(f"{data} e {inv}\n")
+            # print(f"{data} e {inv}\n")
             axis, value = parse_data(data)
 
             move(axis, value)
@@ -165,7 +165,7 @@ def conectar_porta(port_name, root, botao_conectar, status_label, mudar_cor_circ
         mudar_cor_circulo("green")
         botao_conectar.config(text="Conectado")  # Update button text to indicate connection
         print(f"Conectado em {port_name}")
-        ser.write(b'c')
+        ser.write(b'c') 
         root.update()
 
         # Inicia o loop de leitura (bloqueante).
@@ -181,7 +181,7 @@ def conectar_porta(port_name, root, botao_conectar, status_label, mudar_cor_circ
     finally:
         if ser and ser.is_open:
             try:
-                ser.write(b'e')  
+                ser.write(b'e')
                 sleep(0.1)  
                 ser.close()
                 print("Porta serial fechada.")
@@ -209,7 +209,7 @@ def criar_janela():
     # Load and set background image using Pillow
     try:
         # Load the image with Pillow
-        image = Image.open("stardew_img.jpg")
+        image = Image.open("./img/stardew_img.jpg")
         # Convert to PhotoImage
         bg_image = ImageTk.PhotoImage(image)
         # Draw the image on the canvas
