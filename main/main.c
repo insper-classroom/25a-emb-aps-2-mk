@@ -200,10 +200,9 @@ void uart_task(void *parametros) {
 
 void led_task(void *parametros) {
     int conectado = 0;
-    char comando;
     
     while (1) {
-        comando = getchar_timeout_us(10000);
+        char comando = getchar_timeout_us(10000);
 
         if (comando == 'c'){
             conectado = 1;
