@@ -17,6 +17,11 @@
 #define BTN_R 17
 #define BTN_ESQ 14
 #define BTN_DIR 15
+
+#define BTN_INTERACAO 1
+#define BTN_MISSAO 1
+#define BTN_MACRO 1
+
 #define LED_CONEXAO 13
 
 QueueHandle_t xQueueADC;
@@ -37,8 +42,13 @@ int64_t alarm_callback(alarm_id_t id, void *user_data) {
 void btn_callback(uint gpio, uint32_t events) {
     adc_t btn;
 
+    // ids 0 e 1 -> joystick
     if (gpio == BTN_G){
         btn.id = 2;
+    } else if (gpio == BTN_INTERACAO){
+        btn.id = 3;
+    } else if (gpio == BTN_MISSAO){
+        btn.id = 4;
     } else if (gpio == BTN_R) {
         btn.id = 5;
     } else if (gpio == BTN_ESQ){
@@ -97,6 +107,21 @@ void inicializar_hardware(void) {
     gpio_set_dir(BTN_R, GPIO_IN);
     gpio_pull_up(BTN_R);
     gpio_set_irq_enabled_with_callback(BTN_R, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+
+    gpio_init(BTN_MISSAO);
+    gpio_set_dir(BTN_MISSAO, GPIO_IN);
+    gpio_pull_up(BTN_MISSAO);
+    gpio_set_irq_enabled_with_callback(BTN_MISSAO, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+
+    gpio_init(BTN_INTERACAO);
+    gpio_set_dir(BTN_INTERACAO, GPIO_IN);
+    gpio_pull_up(BTN_INTERACAO);
+    gpio_set_irq_enabled_with_callback(BTN_INTERACAO, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
+
+    gpio_init(BTN_MACRO);
+    gpio_set_dir(BTN_MACRO, GPIO_IN);
+    gpio_pull_up(BTN_MACRO);
+    gpio_set_irq_enabled_with_callback(BTN_MACRO, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &btn_callback);
 
     gpio_init(BTN_DIR);
     gpio_set_dir(BTN_DIR, GPIO_IN);
@@ -213,7 +238,7 @@ void btn_task (void *parametros){
 
 void led_task(void *parametros) {
     int conectado = 0;
-    char comando = 'e';
+    char comando;
     
     while (1) {
         comando = getchar_timeout_us(10000);

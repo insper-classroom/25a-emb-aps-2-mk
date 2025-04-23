@@ -15,14 +15,17 @@ teclado = keyboard.Controller()
 click = mouse.Controller()
 i_inv = 1
 inv = False
+mis = False
 
 def move(axis, value):
-    global i_inv, inv
+    global i_inv, inv, mis
     inv_teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0','-','=']
     """Move o mouse de acordo com o eixo e valor recebidos."""
     # print(f"AXIS: {axis} \n")
     if (axis == 0):
         if (inv):
+            pyautogui.moveRel(0, -value*0.7)
+        elif (mis):
             pyautogui.moveRel(0, -value*0.7)
         else:
             if (value > 0):
@@ -37,6 +40,8 @@ def move(axis, value):
 
     elif (axis == 1):
         if (inv):
+            pyautogui.moveRel(value*0.7, 0)
+        elif(mis):
             pyautogui.moveRel(value*0.7, 0)
         else:
             if (value < 0):
@@ -54,6 +59,19 @@ def move(axis, value):
             click.press(mouse.Button.left)
         else:
             click.release(mouse.Button.left)
+    
+    elif (axis == 3):
+        if (value == 1):
+            teclado.press('x')
+        else:
+            teclado.release('x')
+    
+    elif (axis == 4):
+        if (value == 1):
+            teclado.press('f')
+            mis = not mis
+        else:
+            teclado.release('f')
 
     elif (axis == 5):
         if (value == 1):
