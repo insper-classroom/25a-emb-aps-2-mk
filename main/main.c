@@ -23,14 +23,57 @@
 #define BTN_MACRO 20
 
 #define LED_CONEXAO 13
+#define BUZZER 12
 
 QueueHandle_t xQueueADC;
 QueueHandle_t xQueueBTN;
+QueueHandle_t xQueueBUZ;
 
 typedef struct {
     int id;
     int dados;
 } adc_t;
+
+typedef struct {
+    int notas[10];
+    int duracao[10];
+    int tamanho;
+} sound_t;
+
+static sound_t sounds[] = {
+    // 0: Ligar - Melodia de Boas-Vindas
+    {{392, 440, 523, 587, 0, 0, 0, 0, 0, 0}, {200, 200, 200, 300, 0, 0, 0, 0, 0, 0}, 4},
+    // 1: Conectar - Sinfonia de Conexão Estelar
+    {{523, 659, 784, 880, 784, 659, 880, 1046, 0, 0}, {150, 150, 150, 150, 150, 150, 200, 300, 0, 0}, 8},
+    // 2: BTN_G - Impacto da Ferramenta
+    {{330, 523, 0, 0, 0, 0, 0, 0, 0, 0}, {100, 100, 0, 0, 0, 0, 0, 0, 0, 0}, 2},
+    // 3: BTN_INTERACAO - Seleção Rápida (Interação)
+    {{784, 880, 0, 0, 0, 0, 0, 0, 0, 0}, {100, 100, 0, 0, 0, 0, 0, 0, 0, 0}, 2},
+    // 4: BTN_MISSAO - Abertura de Menu
+    {{440, 523, 659, 0, 0, 0, 0, 0, 0, 0}, {150, 150, 150, 0, 0, 0, 0, 0, 0, 0}, 3},
+    // 5: BTN_R - Abertura de Menu (mesmo som de MISSÃO)
+    {{440, 523, 659, 0, 0, 0, 0, 0, 0, 0}, {150, 150, 150, 0, 0, 0, 0, 0, 0, 0}, 3},
+    // 6: BTN_ESQ - Seleção Rápida (Navegar Esquerda)
+    {{392, 440, 0, 0, 0, 0, 0, 0, 0, 0}, {100, 100, 0, 0, 0, 0, 0, 0, 0, 0}, 2},
+    // 7: BTN_DIR - Seleção Rápida (Navegar Direita)
+    {{587, 659, 0, 0, 0, 0, 0, 0, 0, 0}, {100, 100, 0, 0, 0, 0, 0, 0, 0, 0}, 2},
+    // 8: BTN_MACRO - Seleção Rápida (Macro)
+    {{988, 1046, 0, 0, 0, 0, 0, 0, 0, 0}, {100, 100, 0, 0, 0, 0, 0, 0, 0, 0}, 2}
+};
+
+
+void play_buzzer(int BUZ, int notas[], int duracao[], int tamanho) {
+    for (int i = 0; i < tamanho; i++) {
+        if (notas[i] == 0) break;
+        int periodo = 1000000 / notas[i];
+        for (int j = 0; j < duracao[i] * 1000 / periodo; j++) {
+            gpio_put(BUZ, 1);
+            sleep_us(periodo / 2);
+            gpio_put(BUZ, 0);
+            sleep_us(periodo / 2);
+        }
+    }
+}
 
 void btn_callback(uint gpio, uint32_t events) {
     adc_t btn;
@@ -124,6 +167,9 @@ void inicializar_hardware(void) {
 
     gpio_init(LED_CONEXAO);
     gpio_set_dir(LED_CONEXAO, GPIO_OUT);
+
+    gpio_init(BUZZER);
+    gpio_set_dir(BUZZER, GPIO_OUT);
 }
 
 void x_task(void *parametros) {
@@ -216,12 +262,23 @@ void led_task(void *parametros) {
     }
 }
 
+void buzzer_task(void *parametros) {
+    int sound_id;
+
+    while (1) {
+        if (xQueueReceive(xQueueBUZ, &sound_id, portMAX_DELAY)) {
+            play_buzzer(BUZZER, sounds[sound_id].notas, sounds[sound_id].duracao, sounds[sound_id].tamanho);
+        }
+    }
+}
+
 int main(void) {
 
     inicializar_hardware();
     
     xQueueADC = xQueueCreate(8, sizeof(adc_t));
     xQueueBTN = xQueueCreate(8, sizeof(adc_t));
+    xQueueBUZ = xQueueCreate(8, sizeof(sound_t));
     
     xTaskCreate(x_task, "Tarefa Eixo X", 4095, NULL, 1, NULL);
     xTaskCreate(y_task, "Tarefa Eixo Y", 4095, NULL, 1, NULL);
