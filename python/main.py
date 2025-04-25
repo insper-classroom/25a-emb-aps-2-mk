@@ -6,7 +6,7 @@ pyautogui.PAUSE=0.0
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
-from time import sleep
+from time import sleep, time
 from PIL import Image, ImageTk
 
 from pynput import keyboard, mouse
@@ -16,12 +16,50 @@ click = mouse.Controller()
 i_inv = 1
 inv = False
 mis = False
+lista_macro = []
+tempo_medido = 0
+estado_macro = 0
+qnt_comandos = 0
+
+def ler_macro():
+    global lista_macro, estado_macro
+
+    if not lista_macro or len(lista_macro) < 2:
+        estado_macro = 0
+        return
+
+    t_base = lista_macro[0][1]
+
+    for i in range(len(lista_macro)):
+        axis, t, value = lista_macro[i]
+
+        # Tempo até o próximo comando
+        if i == 0:
+            t_atual = t - t_base 
+        else: 
+            t_atual = lista_macro[i][1] - lista_macro[i - 1][1]
+
+        sleep(max(0, t_atual))
+
+        move(axis, value)
+
+    estado_macro = 0  # Finaliza leitura
 
 def move(axis, value):
-    global i_inv, inv, mis
+    global i_inv, inv, mis, lista_macro, tempo_medido, estado_macro, qnt_comandos
     inv_teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0','-','=']
     """Move o mouse de acordo com o eixo e valor recebidos."""
     # print(f"AXIS: {axis} \n")
+
+    print(f"Estado: {estado_macro}, Tamanho: {qnt_comandos} \n")
+
+    if (estado_macro == 1):    # Criando o macro
+        if (qnt_comandos == 0):
+            lista_macro = []
+        if (axis != 8):
+            lista_macro.append([axis, time(), value])
+            qnt_comandos += 1
+
     if (axis == 0):
         if (inv):
             pyautogui.moveRel(0, -value)
@@ -93,6 +131,20 @@ def move(axis, value):
             teclado.press(inv_teclas[i_inv])
         else:
             teclado.release(inv_teclas[i_inv])
+    
+    elif (axis == 8):
+        if (value == 1):
+            tempo_medido = time()
+        else:
+            if (estado_macro == 1):                 # Estava guardando info no macro
+                estado_macro = 0
+            elif (time() - tempo_medido > 1):       # Segurou
+                estado_macro = -1  # Lendo o macro
+                ler_macro()
+            else:                                   # Não segurou
+                qnt_comandos = 0
+                estado_macro = 1   # Criando o macro
+
 
 def controle(ser):
     """

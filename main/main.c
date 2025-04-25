@@ -61,16 +61,16 @@ static sound_t sounds[] = {
     {{988, 1046, 0, 0, 0, 0, 0, 0, 0, 0}, {100, 100, 0, 0, 0, 0, 0, 0, 0, 0}, 2}
 };
 
-
-void play_buzzer(int BUZ, int notas[], int duracao[], int tamanho) {
-    for (int i = 0; i < tamanho; i++) {
-        if (notas[i] == 0) break;
-        int periodo = 1000000 / notas[i];
-        for (int j = 0; j < duracao[i] * 1000 / periodo; j++) {
+void play_buzzer(int BUZ, sound_t sound) {
+    // int notas[], int duracao[], int tamanho
+    for (int i = 0; i < sound.tamanho; i++) {
+        if (sound.notas[i] == 0) break;
+        int periodo = 1000 / sound.notas[i];
+        for (int j = 0; j < sound.duracao[i] * 1000 / periodo; j++) {
             gpio_put(BUZ, 1);
-            sleep_us(periodo / 2);
+            vTaskDelay(pdMS_TO_TICKS(periodo / 2));
             gpio_put(BUZ, 0);
-            sleep_us(periodo / 2);
+            vTaskDelay(pdMS_TO_TICKS(periodo / 2));
         }
     }
 }
@@ -274,7 +274,7 @@ void buzzer_task(void *parametros) {
 
     while (1) {
         if (xQueueReceive(xQueueBUZ, &sound_id, portMAX_DELAY)) {
-            play_buzzer(BUZZER, sounds[sound_id].notas, sounds[sound_id].duracao, sounds[sound_id].tamanho);
+            play_buzzer(BUZZER, sounds[sound_id]);
         }
     }
 }
@@ -291,6 +291,7 @@ int main(void) {
     xTaskCreate(y_task, "Tarefa Eixo Y", 4095, NULL, 1, NULL);
     xTaskCreate(uart_task, "Tarefa UART", 4095, NULL, 1, NULL);
     xTaskCreate(led_task, "Tarefa LED Conexao", 4095, NULL, 1, NULL);
+    xTaskCreate(buzzer_task, "Tarefa Buzzer", 4095, NULL, 1, NULL);
     
     vTaskStartScheduler();
     
