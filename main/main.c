@@ -3,13 +3,15 @@
 #include <semphr.h>
 #include <queue.h>
 #include <string.h> 
+#include <stdio.h>
+
 #include "ssd1306.h"
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
-#include "gfx.h"
-#include "pico/stdlib.h"
-#include <stdio.h>
 #include "hardware/irq.h"
+#include "hardware/pwm.h"
+#include "pico/stdlib.h"
+#include "gfx.h"
 
 #define VRX_PIN 26
 #define VRY_PIN 27
@@ -54,26 +56,51 @@ static sound_t sounds[] = {
     {{440, 523, 659, 0, 0, 0, 0, 0, 0, 0}, {150, 150, 150, 0, 0, 0, 0, 0, 0, 0}, 3}
 };
 
+void pwm_set_freq(uint slice_num, uint freq_hz) {
+    uint32_t clock = 125000000;
+    uint32_t divider16 = 16 * clock / freq_hz / 65536 + 1;
+    if (divider16 > 256 * 16) divider16 = 256 * 16;
+
+    float divider = divider16 / 16.0f;
+    uint32_t top = clock / freq_hz / divider;
+
+    pwm_set_clkdiv(slice_num, divider);
+    pwm_set_wrap(slice_num, top);
+}
+
 void buzzer_task(void *parametros) {
     sound_t sound;
+
+    gpio_set_function(BUZZER, GPIO_FUNC_PWM);
+    uint slice_num = pwm_gpio_to_slice_num(BUZZER);
+    pwm_set_enabled(slice_num, true);
 
     while(1){
         if (xQueueReceive(xQueueBUZ, &sound, portMAX_DELAY)){
             for (int i = 0; i < sound.tamanho; i++) {
-                if (sound.notas[i] == 0) break;
-
                 int freq = sound.notas[i];
-                int dur_ms = sound.duracao[i];
+                int dur = sound.duracao[i];
 
-                int periodo_us = 1000000 / freq;
-                int ciclos = (dur_ms * 1000) / periodo_us;
-
-                for (int j = 0; j < ciclos; j++) {
-                    gpio_put(BUZZER, 1);
-                    busy_wait_us_32(periodo_us / 2);
-                    gpio_put(BUZZER, 0);
-                    busy_wait_us_32(periodo_us / 2);
+                if (freq <= 0) {
+                    pwm_set_enabled(slice_num, false);
+                    vTaskDelay(pdMS_TO_TICKS(dur));
+                    continue;
                 }
+
+                uint32_t clock = 125000000;
+                uint32_t divider16 = 16 * clock / freq / 65536 + 1;
+                if (divider16 > 256 * 16) divider16 = 256 * 16;
+
+                float divider = divider16 / 16.0f;
+                uint32_t top = clock / freq / divider;
+
+                pwm_set_clkdiv(slice_num, divider);
+                pwm_set_wrap(slice_num, top);
+                pwm_set_chan_level(slice_num, pwm_gpio_to_channel(BUZZER), top / 2);
+
+                pwm_set_enabled(slice_num, true);
+                vTaskDelay(pdMS_TO_TICKS(dur));
+                pwm_set_enabled(slice_num, false);
             }
         }
     }
