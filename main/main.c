@@ -92,6 +92,8 @@ void btn_callback(uint gpio, uint32_t events) {
         btn.id = 6;
     } else if (gpio == BTN_DIR){
         btn.id = 7;
+    } else if (gpio == BTN_MACRO){
+        btn.id = 8;
     }
 
     if (events & 0x4) { 
@@ -164,6 +166,11 @@ void inicializar_hardware(void) {
     gpio_set_dir(BTN_ESQ, GPIO_IN);
     gpio_pull_up(BTN_ESQ);
     gpio_set_irq_enabled(BTN_ESQ, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
+
+    gpio_init(BTN_MACRO);
+    gpio_set_dir(BTN_MACRO, GPIO_IN);
+    gpio_pull_up(BTN_MACRO);
+    gpio_set_irq_enabled(BTN_MACRO, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
 
     gpio_init(LED_CONEXAO);
     gpio_set_dir(LED_CONEXAO, GPIO_OUT);
