@@ -26,7 +26,6 @@
 #define BUZZER 12
 
 QueueHandle_t xQueueADC;
-QueueHandle_t xQueueBTN;
 QueueHandle_t xQueueBUZ;
 
 typedef struct {
@@ -52,25 +51,30 @@ static sound_t sounds[] = {
     // 4: BTN_MISSAO - Abertura de Menu
     {{440, 523, 659, 0, 0, 0, 0, 0, 0, 0}, {150, 150, 150, 0, 0, 0, 0, 0, 0, 0}, 3},
     // 5: BTN_R - Abertura de Menu (mesmo som de MISSÃO)
-    {{440, 523, 659, 0, 0, 0, 0, 0, 0, 0}, {150, 150, 150, 0, 0, 0, 0, 0, 0, 0}, 3},
-    // 6: BTN_ESQ - Seleção Rápida (Navegar Esquerda)
-    {{392, 440, 0, 0, 0, 0, 0, 0, 0, 0}, {100, 100, 0, 0, 0, 0, 0, 0, 0, 0}, 2},
-    // 7: BTN_DIR - Seleção Rápida (Navegar Direita)
-    {{587, 659, 0, 0, 0, 0, 0, 0, 0, 0}, {100, 100, 0, 0, 0, 0, 0, 0, 0, 0}, 2},
-    // 8: BTN_MACRO - Seleção Rápida (Macro)
-    {{988, 1046, 0, 0, 0, 0, 0, 0, 0, 0}, {100, 100, 0, 0, 0, 0, 0, 0, 0, 0}, 2}
+    {{440, 523, 659, 0, 0, 0, 0, 0, 0, 0}, {150, 150, 150, 0, 0, 0, 0, 0, 0, 0}, 3}
 };
 
-void play_buzzer(int BUZ, sound_t sound) {
-    // int notas[], int duracao[], int tamanho
-    for (int i = 0; i < sound.tamanho; i++) {
-        if (sound.notas[i] == 0) break;
-        int periodo = 1000 / sound.notas[i];
-        for (int j = 0; j < sound.duracao[i] * 1000 / periodo; j++) {
-            gpio_put(BUZ, 1);
-            vTaskDelay(pdMS_TO_TICKS(periodo / 2));
-            gpio_put(BUZ, 0);
-            vTaskDelay(pdMS_TO_TICKS(periodo / 2));
+void buzzer_task(void *parametros) {
+    sound_t sound;
+
+    while(1){
+        if (xQueueReceive(xQueueBUZ, &sound, portMAX_DELAY)){
+            for (int i = 0; i < sound.tamanho; i++) {
+                if (sound.notas[i] == 0) break;
+
+                int freq = sound.notas[i];
+                int dur_ms = sound.duracao[i];
+
+                int periodo_us = 1000000 / freq;
+                int ciclos = (dur_ms * 1000) / periodo_us;
+
+                for (int j = 0; j < ciclos; j++) {
+                    gpio_put(BUZZER, 1);
+                    busy_wait_us_32(periodo_us / 2);
+                    gpio_put(BUZZER, 0);
+                    busy_wait_us_32(periodo_us / 2);
+                }
+            }
         }
     }
 }
@@ -251,31 +255,42 @@ void uart_task(void *parametros) {
     }
 }
 
-void led_task(void *parametros) {
-    int conectado = 0;
-    
+void talk_task(void *parametros) {
+    int conectado = 0, batendo = 0;
+    sound_t som;
+
     while (1) {
         char comando = getchar_timeout_us(10000);
 
         if (comando == 'c'){
             conectado = 1;
+            som = sounds[1];
+            xQueueSend(xQueueBUZ, &som, 1000);
         } else if (comando == 'e'){
             conectado = 0;
+        } else if (comando == 'l'){
+            batendo = 1;
+        } else if (comando == 'u'){
+            batendo = 0;
+        }else if (comando == 'x'){
+            som = sounds[3];
+            xQueueSend(xQueueBUZ, &som, 1000);
+        } else if (comando == 'f'){
+            som = sounds[4];
+            xQueueSend(xQueueBUZ, &som, 1000);
+        } else if (comando == 'i'){
+            som = sounds[5];
+            xQueueSend(xQueueBUZ, &som, 1000);
         }
 
+        if (batendo == 1){
+            som = sounds[2];
+            xQueueSend(xQueueBUZ, &som, 1000);
+        }
+        
         gpio_put(LED_CONEXAO, conectado);
 
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-}
-
-void buzzer_task(void *parametros) {
-    int sound_id;
-
-    while (1) {
-        if (xQueueReceive(xQueueBUZ, &sound_id, portMAX_DELAY)) {
-            play_buzzer(BUZZER, sounds[sound_id]);
-        }
+        vTaskDelay(pdMS_TO_TICKS(150));
     }
 }
 
@@ -284,14 +299,16 @@ int main(void) {
     inicializar_hardware();
     
     xQueueADC = xQueueCreate(8, sizeof(adc_t));
-    xQueueBTN = xQueueCreate(8, sizeof(adc_t));
     xQueueBUZ = xQueueCreate(8, sizeof(sound_t));
     
     xTaskCreate(x_task, "Tarefa Eixo X", 4095, NULL, 1, NULL);
     xTaskCreate(y_task, "Tarefa Eixo Y", 4095, NULL, 1, NULL);
     xTaskCreate(uart_task, "Tarefa UART", 4095, NULL, 1, NULL);
-    xTaskCreate(led_task, "Tarefa LED Conexao", 4095, NULL, 1, NULL);
+    xTaskCreate(talk_task, "Tarefa Talk", 4095, NULL, 1, NULL);
     xTaskCreate(buzzer_task, "Tarefa Buzzer", 4095, NULL, 1, NULL);
+
+    sound_t som = sounds[0];
+    xQueueSend(xQueueBUZ, &som, 1000);
     
     vTaskStartScheduler();
     

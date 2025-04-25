@@ -21,7 +21,7 @@ tempo_medido = 0
 estado_macro = 0
 qnt_comandos = 0
 
-def ler_macro():
+def ler_macro(ser):
     global lista_macro, estado_macro
 
     if not lista_macro or len(lista_macro) < 2:
@@ -41,11 +41,11 @@ def ler_macro():
 
         sleep(max(0, t_atual))
 
-        move(axis, value)
+        move(axis, value, ser)
 
     estado_macro = 0  # Finaliza leitura
 
-def move(axis, value):
+def move(axis, value, ser):
     global i_inv, inv, mis, lista_macro, tempo_medido, estado_macro, qnt_comandos
     inv_teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0','-','=']
     """Move o mouse de acordo com o eixo e valor recebidos."""
@@ -94,18 +94,22 @@ def move(axis, value):
 
     elif (axis == 2):
         if (value == 1):
+            ser.write(b'l')
             click.press(mouse.Button.left)
         else:
+            ser.write(b'u')
             click.release(mouse.Button.left)
     
     elif (axis == 3):
         if (value == 1):
+            ser.write(b'x')
             teclado.press('x')
         else:
             teclado.release('x')
     
     elif (axis == 4):
         if (value == 1):
+            ser.write(b'f')
             teclado.press('f')
             mis = not mis
         else:
@@ -113,6 +117,7 @@ def move(axis, value):
 
     elif (axis == 5):
         if (value == 1):
+            ser.write(b'i')
             teclado.press('e')
             inv = not inv
         else:
@@ -140,7 +145,7 @@ def move(axis, value):
                 estado_macro = 0
             elif (time() - tempo_medido > 1):       # Segurou
                 estado_macro = -1  # Lendo o macro
-                ler_macro()
+                ler_macro(ser)
             else:                                   # Não segurou
                 qnt_comandos = 0
                 estado_macro = 1   # Criando o macro
@@ -165,7 +170,7 @@ def controle(ser):
             # print(f"{data} e {inv}\n")
             axis, value = parse_data(data)
 
-            move(axis, value)
+            move(axis, value, ser)
 
 def serial_ports():
     """Retorna uma lista das portas seriais disponíveis na máquina."""
