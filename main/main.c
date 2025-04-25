@@ -56,24 +56,9 @@ static sound_t sounds[] = {
     {{440, 523, 659, 0, 0, 0, 0, 0, 0, 0}, {150, 150, 150, 0, 0, 0, 0, 0, 0, 0}, 3}
 };
 
-void pwm_set_freq(uint slice_num, uint freq_hz) {
-    uint32_t clock = 125000000;
-    uint32_t divider16 = 16 * clock / freq_hz / 65536 + 1;
-    if (divider16 > 256 * 16) divider16 = 256 * 16;
-
-    float divider = divider16 / 16.0f;
-    uint32_t top = clock / freq_hz / divider;
-
-    pwm_set_clkdiv(slice_num, divider);
-    pwm_set_wrap(slice_num, top);
-}
-
 void buzzer_task(void *parametros) {
     sound_t sound;
-
-    gpio_set_function(BUZZER, GPIO_FUNC_PWM);
     uint slice_num = pwm_gpio_to_slice_num(BUZZER);
-    pwm_set_enabled(slice_num, true);
 
     while(1){
         if (xQueueReceive(xQueueBUZ, &sound, portMAX_DELAY)){
@@ -87,6 +72,7 @@ void buzzer_task(void *parametros) {
                     continue;
                 }
 
+                // Redefinindo a frequência do PWM
                 uint32_t clock = 125000000;
                 uint32_t divider16 = 16 * clock / freq / 65536 + 1;
                 if (divider16 > 256 * 16) divider16 = 256 * 16;
@@ -94,10 +80,12 @@ void buzzer_task(void *parametros) {
                 float divider = divider16 / 16.0f;
                 uint32_t top = clock / freq / divider;
 
+                // PWM emite a onda
                 pwm_set_clkdiv(slice_num, divider);
                 pwm_set_wrap(slice_num, top);
                 pwm_set_chan_level(slice_num, pwm_gpio_to_channel(BUZZER), top / 2);
 
+                // Tocando o Buzzer
                 pwm_set_enabled(slice_num, true);
                 vTaskDelay(pdMS_TO_TICKS(dur));
                 pwm_set_enabled(slice_num, false);
@@ -208,6 +196,9 @@ void inicializar_hardware(void) {
 
     gpio_init(BUZZER);
     gpio_set_dir(BUZZER, GPIO_OUT);
+    gpio_set_function(BUZZER, GPIO_FUNC_PWM);
+
+    pwm_set_enabled(pwm_gpio_to_slice_num(BUZZER), true);
 }
 
 void x_task(void *parametros) {
