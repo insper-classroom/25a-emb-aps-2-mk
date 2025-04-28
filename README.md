@@ -57,3 +57,8 @@ O controle será desenvolvido para facilitar a jogabilidade de *Stardew Valley*,
 ![Proposta](img/proposta_controle.png)
 
 ---
+
+![Resultado]()
+
+---
+## Link do vídeo
