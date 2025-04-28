@@ -22,7 +22,7 @@
 
 #define BTN_INTERACAO 18
 #define BTN_MISSAO 19
-#define BTN_MACRO 20
+#define BTN_MACRO 22
 
 #define LED_CONEXAO 13
 #define BUZZER 12
